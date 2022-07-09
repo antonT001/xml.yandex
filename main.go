@@ -97,7 +97,7 @@ func main() {
 			} else {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_completed")
 
-				data_keys, err = request_statistics_0_positions(db, max_test)
+				data_keys, err = request_statistics_0_positions(db, time_request, max_test)
 				if err != nil {
 					log.Fatal("request_keywords(): ", err)
 				}
@@ -314,13 +314,13 @@ func request_keywords(db *sql.DB, n int) ([]Keywords, error) {
 	return data_keys, nil
 }
 
-func request_statistics_0_positions(db *sql.DB, max_test int) ([]Keywords, error) {
+func request_statistics_0_positions(db *sql.DB, time_request int64, max_test int) ([]Keywords, error) {
 	var data_keys []Keywords
 
 	rows, err := db.Query(`SELECT statistics.keyword_id, keywords.keyword_name,hosts.id,hosts.host_name FROM statistics 
 	LEFT JOIN hosts ON hosts.id=statistics.host_id 
 	LEFT JOIN keywords ON keywords.id=statistics.keyword_id 
-	WHERE position_num = 0 && test_number<= ?;`, max_test)
+	WHERE position_num = 0 && date = ? && test_number<= ?;`, time_request, max_test)
 	if err != nil {
 		log.Fatal("equest_statistics_0_positions()", err)
 	}
