@@ -19,16 +19,11 @@ func main() {
 
 	max_test := 5
 
-	// f, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_WRONLY, 0600)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer f.Close()
-
 	db, err := sql.Open("mysql", "user:123456@tcp(127.0.0.1:8080)/xml")
 	if err != nil {
 		log.Fatal("sql.Open ", err)
 	}
+	db.SetMaxOpenConns(10)////////??????????
 
 	pingErr := db.Ping()
 	if pingErr != nil {
@@ -113,7 +108,7 @@ func main() {
 					if err != nil {
 						log.Fatal("UPDATE task completed", err)
 					}
-					defer insert.Close()
+					insert.Close()
 					fmt.Println(time.Now().Format(time.RFC822), "task_completion")
 
 					continue
@@ -161,21 +156,21 @@ func main() {
 						if err != nil {
 							log.Fatal("INSERT INTO statistics ", err)
 						}
-						defer insert.Close()    //нужно два?
-						time.Sleep(time.Second) //Error 1040: Too many connections
+						insert.Close()
+
 						insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE task ", err)
 						}
-						defer insert.Close()    //нужно 2?
-						time.Sleep(time.Second) //Error 1040: Too many connections
+						insert.Close() 
+
 					} else { //старое значения в базе
 						insert, err := db.Query(`UPDATE statistics SET position_num = ?, test_number=test_number+1 
 						WHERE keyword_id=? && date = ?;`, i+1, data.keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE statistics", err)
 						}
-						defer insert.Close()
+						insert.Close()
 					}
 					result_found = true
 					break
@@ -189,7 +184,12 @@ func main() {
 					if err != nil {
 						log.Fatal("INSERT INTO statistics when position_num=0", err)
 					}
-					defer insert.Close()
+					insert.Close()
+					insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.keyword_id, time_request)
+					if err != nil {
+						log.Fatal("UPDATE task ", err)
+					}
+					insert.Close()
 				}
 			}
 			time.Sleep(time.Second)
@@ -201,7 +201,7 @@ func main() {
 			if err != nil {
 				log.Fatal("UPDATE statistics", err)
 			}
-			defer insert.Close()
+			insert.Close()
 			fmt.Println(time.Now().Format(time.RFC822), "primary_check_completed")
 		}
 
@@ -337,5 +337,5 @@ func creation_new_task(db *sql.DB, time_request int64) {
 	if err != nil {
 		log.Fatal("INSERT INTO task date ", err)
 	}
-	defer insert.Close()
+	insert.Close()
 }
