@@ -23,7 +23,9 @@ func main() {
 	if err != nil {
 		log.Fatal("sql.Open ", err)
 	}
-	db.SetMaxOpenConns(10)////////??????????
+	db.SetMaxOpenConns(10)
+	db.SetConnMaxIdleTime(time.Second * 10)
+	db.SetConnMaxLifetime(time.Second * 10)
 
 	pingErr := db.Ping()
 	if pingErr != nil {
@@ -80,11 +82,11 @@ func main() {
 		} else {
 			fmt.Println(time.Now().Format(time.RFC822), "last_task_not_completed")
 
+			time_request = data_task.date
+			fmt.Println(time.Now().Format(time.RFC822), "copy_time_request_from_task")
+
 			if data_task.primary_check == 0 {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_not_completed")
-
-				time_request = data_task.date
-				fmt.Println(time.Now().Format(time.RFC822), "copy_time_request_from_task")
 
 				data_keys, err = request_keywords(db, data_task.last_processed_key_id)
 				if err != nil {
@@ -149,8 +151,6 @@ func main() {
 			for i, vol := range result {
 				if vol.Host_name == data.host_name {
 					if data.in_statistics == 0 { //новое значение в базу
-						//плохо, что у меня сделано два запроса. Можно объеденить в один? В данной логике важно, чтоб они выполнились
-						//оба или ниодного
 						insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.host_id, data.keyword_id)
 						if err != nil {
@@ -162,11 +162,12 @@ func main() {
 						if err != nil {
 							log.Fatal("UPDATE task ", err)
 						}
-						insert.Close() 
+						insert.Close()
 
 					} else { //старое значения в базе
-						insert, err := db.Query(`UPDATE statistics SET position_num = ?, test_number=test_number+1 
-						WHERE keyword_id=? && date = ?;`, i+1, data.keyword_id, time_request)
+
+						insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ? test_number=test_number+1 
+						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE statistics", err)
 						}
@@ -190,13 +191,20 @@ func main() {
 						log.Fatal("UPDATE task ", err)
 					}
 					insert.Close()
+				} else {
+					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 
+					WHERE keyword_id=? && date = ?;`, data.keyword_id, time_request)
+					if err != nil {
+						log.Fatal("UPDATE statistics", err)
+					}
+					insert.Close()
 				}
 			}
 			time.Sleep(time.Second)
 		}
 
 		if !error_flag {
-			//отметить в базе, что первичный проход выполнен
+			//первичный проход выполнен
 			insert, err := db.Query(`UPDATE task SET primary_check = 1 WHERE date = ?;`, time_request)
 			if err != nil {
 				log.Fatal("UPDATE statistics", err)
