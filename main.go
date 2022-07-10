@@ -20,7 +20,7 @@ import (
 func main() {
 	var data_keys []Keywords
 
-	max_test := 5
+	max_test := 3
 	active_account_id := 0
 	active_accout := http.DefaultClient
 
@@ -36,7 +36,7 @@ func main() {
 	if pingErr != nil {
 		log.Fatal(pingErr)
 	}
-	fmt.Println(time.Now().Format(time.RFC822), "Connected_db")
+	fmt.Println(time.Now().Format(time.RFC822), "connected_db")
 	defer db.Close()
 
 	data_accounts, err := request_accounts(db)
@@ -162,7 +162,7 @@ func main() {
 				if len(data_keys) < 1 {
 					fmt.Println(time.Now().Format(time.RFC822), "all_0_positions_processed")
 
-					insert, err := db.Query(`UPDATE task SET completed = 1, WHERE date = ?;`, time_request)
+					insert, err := db.Query(`UPDATE task SET completed = 1 WHERE date = ?;`, time_request)
 					if err != nil {
 						log.Fatal("UPDATE task completed", err)
 					}
