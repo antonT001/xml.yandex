@@ -148,7 +148,7 @@ func main() {
 				if err != nil {
 					log.Fatal("request_keywords(): ", err)
 				}
-				fmt.Println(time.Now().Format(time.RFC822), "request_keywords(", data_task.last_processed_key_id, ")")
+				fmt.Printf(time.Now().Format(time.RFC822)+ " request_keywords(%v)\n", data_task.last_processed_key_id)
 
 			} else {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_completed")
@@ -174,21 +174,22 @@ func main() {
 			}
 		}
 
-		fmt.Println(time.Now().Format(time.RFC822), "key_processing...")
+		fmt.Println(time.Now().Format(time.RFC822), "keywords_processing...")
 
 		error_flag := false
 
 		for _, data := range data_keys {
 
-			var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query="+
-				url.QueryEscape(data.keyword_name)+"&groupby=groups-on-page%3D100", data_accounts[active_account_id].account_name,
-				data_accounts[active_account_id].account_key)
+			var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query=%v&groupby=",
+				data_accounts[active_account_id].account_name, data_accounts[active_account_id].account_key,
+				url.QueryEscape(data.keyword_name)) /////
 
-			respData := GetRequest(url, active_accout)
+			respData := GetRequest(url+"groups-on-page%3D100", active_accout) ////
 
 			v := Result{}
 
 			xml.Unmarshal(respData, &v)
+			fmt.Println(time.Now().Format(time.RFC822),"GetRequest ", data.keyword_name)
 
 			response := v.Response
 
@@ -221,6 +222,8 @@ func main() {
 			for i, vol := range result {
 				if vol.Host_name == data.host_name {
 					if data.in_statistics == 0 { //новое значение в базу
+						fmt.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_write_to_the_database\n", i)
+
 						insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.host_id, data.keyword_id)
 						if err != nil {
@@ -235,6 +238,7 @@ func main() {
 						insert.Close()
 
 					} else { //старое значения в базе
+						fmt.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_update_the_value_in_the_database\n", i)
 
 						insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
 						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.keyword_id, time_request)
@@ -250,6 +254,8 @@ func main() {
 
 			if !result_found {
 				if data.in_statistics == 0 {
+					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_write_position_0_to_database")
+
 					insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 					VALUES (?, ?, ?, ?, ?)`, 0, vol.Url, time_request, data.host_id, data.keyword_id)
 					if err != nil {
@@ -262,6 +268,7 @@ func main() {
 					}
 					insert.Close()
 				} else {
+					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_updating_test_information")
 
 					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.keyword_id, time_request)
 					if err != nil {
