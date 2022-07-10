@@ -1,6 +1,9 @@
 package main
 
 //https://yandex.ru/search/xml?action=limits-info&user=seo-art-spectrum&key=03.437953978:a79c783413e3d0d205a60ce7ea6762c5
+
+//http://user:password2@144.76.91.205:1010/yandex.ru/search/xml?user=migunowvad&key=03.1046407880:1a97fb53f91282cbd5dddc7fb48b8f25&lr=2&query=планкен%20купитьgroupby=groups-on-page%3D100
+
 import (
 	"database/sql"
 	"encoding/xml"
@@ -18,6 +21,8 @@ func main() {
 	var data_keys []Keywords
 
 	max_test := 5
+	active_account_id := 0
+	active_accout := http.DefaultClient
 
 	db, err := sql.Open("mysql", "user:123456@tcp(127.0.0.1:8080)/xml")
 	if err != nil {
@@ -31,8 +36,59 @@ func main() {
 	if pingErr != nil {
 		log.Fatal(pingErr)
 	}
-	fmt.Println(time.Now().Format(time.RFC822), "Connected_db!")
+	fmt.Println(time.Now().Format(time.RFC822), "Connected_db")
 	defer db.Close()
+
+	data_accounts, err := request_accounts(db)
+	if err != nil {
+		log.Fatal("request_accounts", err)
+	}
+	fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
+	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_account_id].account_name)
+
+	/*
+		data_accounts, err := request_accounts(db)
+		if err != nil {
+			fmt.Println(time.Now().Format(time.RFC822), err)
+		}
+		fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
+
+
+		///
+		fmt.Println("data_accounts= ", data_accounts)
+		///
+		///
+		fmt.Println("active_accout= ", active_accout)
+		///
+		active_accout, err = account_change(active_accout, data_accounts)
+		if err != nil {
+			fmt.Println(time.Now().Format(time.RFC822), err)
+		}
+		fmt.Println(time.Now().Format(time.RFC822), "account_change")
+		///
+		fmt.Println("active_accout= ", active_accout)
+		///
+		active_accout, err = account_change(active_accout, data_accounts)
+		if err != nil {
+			fmt.Println(time.Now().Format(time.RFC822), err)
+		}
+		fmt.Println(time.Now().Format(time.RFC822), "account_change")
+		///
+		fmt.Println("active_accout= ", active_accout)
+		///
+		active_accout, err = account_change(active_accout, data_accounts)
+		if err != nil {
+			fmt.Println(time.Now().Format(time.RFC822), err)
+		}
+		fmt.Println(time.Now().Format(time.RFC822), "account_change")
+		///
+		fmt.Println("active_accout= ", active_accout)
+		///
+
+		///
+		time.Sleep(time.Minute)
+		///
+	*/
 
 	for {
 		time_request := time.Now().Unix()
@@ -124,9 +180,11 @@ func main() {
 
 		for _, data := range data_keys {
 
-			var url = `https://yandex.ru/search/xml?user=seo-art-spectrum&key=03.437953978:a79c783413e3d0d205a60ce7ea6762c5&lr=2&query=` + url.QueryEscape(data.keyword_name) + `&groupby=groups-on-page%3D100`
+			var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query="+
+				url.QueryEscape(data.keyword_name)+"&groupby=groups-on-page%3D100", data_accounts[active_account_id].account_name,
+				data_accounts[active_account_id].account_key)
 
-			respData := GetRequest(url)
+			respData := GetRequest(url, active_accout)
 
 			v := Result{}
 
@@ -137,9 +195,21 @@ func main() {
 			if response.Error.Error_code != 0 {
 				fmt.Println(time.Now().Format(time.RFC822), "error code = ", response.Error.Error_code)
 				//https://yandex.ru/dev/xml/doc/dg/reference/error-codes.html#error-codes
-				fmt.Println(time.Now().Format(time.RFC822), "sleep 5 minutes")
-				time.Sleep(time.Minute * 5)
-				error_flag = true
+
+				active_account_id, active_accout = account_change(active_account_id, data_accounts)
+				fmt.Println(time.Now().Format(time.RFC822), "account_change")
+
+				if active_account_id == 0 {
+					data_accounts, err = request_accounts(db)
+					if err != nil {
+						log.Fatal("request_accounts", err)
+					}
+					fmt.Println(time.Now().Format(time.RFC822), "sleep_5_minutes")
+					time.Sleep(time.Minute * 5)
+					fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
+				}
+
+				error_flag = true /// проверить необходимость
 				break
 			}
 
@@ -166,7 +236,7 @@ func main() {
 
 					} else { //старое значения в базе
 
-						insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ? test_number=test_number+1 
+						insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
 						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE statistics", err)
@@ -192,8 +262,8 @@ func main() {
 					}
 					insert.Close()
 				} else {
-					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 
-					WHERE keyword_id=? && date = ?;`, data.keyword_id, time_request)
+
+					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.keyword_id, time_request)
 					if err != nil {
 						log.Fatal("UPDATE statistics", err)
 					}
@@ -215,6 +285,15 @@ func main() {
 
 	}
 
+}
+
+type Account struct {
+	id             int
+	account_name   string
+	account_key    string
+	proxy_ip       string
+	proxy_login    string
+	proxy_password string
 }
 
 type Task struct {
@@ -258,12 +337,12 @@ type Result struct {
 	Response Response `xml:"response"`
 }
 
-func GetRequest(url string) []byte {
+func GetRequest(url string, active_accout *http.Client) []byte {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := active_accout.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -320,7 +399,7 @@ func request_statistics_0_positions(db *sql.DB, time_request int64, max_test int
 	rows, err := db.Query(`SELECT statistics.keyword_id, keywords.keyword_name,hosts.id,hosts.host_name FROM statistics 
 	LEFT JOIN hosts ON hosts.id=statistics.host_id 
 	LEFT JOIN keywords ON keywords.id=statistics.keyword_id 
-	WHERE position_num = 0 && date = ? && test_number<= ?;`, time_request, max_test)
+	WHERE position_num = 0 && date = ? && test_number< ?;`, time_request, max_test)
 	if err != nil {
 		log.Fatal("equest_statistics_0_positions()", err)
 	}
@@ -346,4 +425,43 @@ func creation_new_task(db *sql.DB, time_request int64) {
 		log.Fatal("INSERT INTO task date ", err)
 	}
 	insert.Close()
+}
+
+func account_change(active_accout_id int, data_accounts []Account) (int, *http.Client) {
+	if active_accout_id+1 < len(data_accounts) {
+		active_accout_id++
+
+		proxyUrl, _ := url.Parse(fmt.Sprintf(`http://%v:%v@%v`, data_accounts[active_accout_id].proxy_login,
+			data_accounts[active_accout_id].proxy_password, data_accounts[active_accout_id].proxy_ip))
+
+		myClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+		fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_accout_id].account_name)
+
+		return active_accout_id, myClient
+	}
+	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[0].account_name)
+
+	return 0, http.DefaultClient
+}
+
+func request_accounts(db *sql.DB) ([]Account, error) {
+	var data_accounts []Account
+	rows, err := db.Query(`SELECT * FROM accounts;`)
+	if err != nil {
+		log.Fatal("request_accounts()", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var data Account
+		if err := rows.Scan(&data.id, &data.account_name, &data.account_key, &data.proxy_ip,
+			&data.proxy_login, &data.proxy_password); err != nil {
+			return nil, fmt.Errorf("request_accounts() %v", err)
+		}
+		data_accounts = append(data_accounts, data)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("request_accounts() %v", err)
+	}
+	return data_accounts, nil
 }
