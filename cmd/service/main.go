@@ -216,7 +216,7 @@ func main() {
 				response := v.Response
 
 				if response.Error.Error_code != 0 {
-					infoLog.Println("error code = ", response.Error.Error_code)
+					infoLog.Println("error_code:", response.Error.Error_code)
 					//https://yandex.ru/dev/xml/doc/dg/reference/error-codes.html#error-codes
 
 					active_account_id, active_accout, err = account_change(active_account_id, data_accounts)
@@ -226,8 +226,9 @@ func main() {
 						time.Sleep(time.Minute)
 						break
 					}
-					infoLog.Println("activated_account:", data_accounts[active_account_id].Account_name)
 					infoLog.Println("account_change")
+					infoLog.Println("activated_account:", data_accounts[active_account_id].Account_name)
+					
 
 					if active_account_id == 0 {
 						data_accounts, err = request_accounts(db)
