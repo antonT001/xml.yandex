@@ -134,8 +134,10 @@ func main() {
 				} else { //сегодня, сделать паузу до конца суток
 					infoLog.Println("last_task_completed_today")
 
-					infoLog.Println("sleep_30_minutes") //////
-					time.Sleep(time.Minute * 30)//////
+					h, m, _ := time.Now().Clock()
+					time_out := (24-h)*60 + 60 - m + 60
+					infoLog.Printf("sleep_%v_minutes", time_out)      //////
+					time.Sleep(time.Duration(time_out) * time.Minute) //////
 
 					continue
 				}
@@ -235,8 +237,11 @@ func main() {
 							time.Sleep(time.Minute)
 							break
 						}
-						infoLog.Println("sleep_5_minutes")
-						time.Sleep(time.Minute * 5)
+
+						m := time.Now().Minute()
+						time_out := 60 - m + 5
+						infoLog.Printf("sleep_%v_minutes", time_out)      //////
+						time.Sleep(time.Duration(time_out) * time.Minute) //////
 						infoLog.Println("request_accounts")
 					}
 
