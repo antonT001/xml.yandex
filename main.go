@@ -128,10 +128,10 @@ func main() {
 
 			} else { //сегодня, сделать паузу до конца суток
 				fmt.Println(time.Now().Format(time.RFC822), "last_task_completed_today")
-
-				time.Sleep(time.Minute * 30)                                    //////
+				
 				fmt.Println(time.Now().Format(time.RFC822), "Sleep 30 minutes") //////
-
+				time.Sleep(time.Minute * 30)                                    //////
+				
 				continue
 			}
 
