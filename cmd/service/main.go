@@ -8,19 +8,37 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
+
+	"xml.yandex/internal/models"
+
+	"gopkg.in/yaml.v3"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-	var data_keys []Keywords
+	var data_keys []models.Keywords
 
 	max_test := 3
 	active_account_id := 0
 	active_accout := http.DefaultClient
+	var config_db models.Database
 
-	db, err := sql.Open("mysql", "user:123456@tcp(127.0.0.1:8080)/xml")
+	data, err := os.ReadFile(".config.cfg")
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	err = yaml.Unmarshal([]byte(data), &config_db)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	dataSourceName := fmt.Sprintf("%v:%v@tcp(%v)/%v", config_db.User_name, config_db.Password, config_db.Host, config_db.Db_name)
+
+	db, err := sql.Open("mysql", dataSourceName)
 	if err != nil {
 		log.Fatal("sql.Open ", err)
 	}
@@ -40,7 +58,7 @@ func main() {
 		log.Fatal("request_accounts", err)
 	}
 	fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
-	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_account_id].account_name)
+	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_account_id].Account_name)
 
 	for {
 		time_request := time.Now().Unix()
@@ -53,7 +71,7 @@ func main() {
 			continue
 		}
 
-		if data_task.date == 0 {
+		if data_task.Date == 0 {
 			fmt.Println(time.Now().Format(time.RFC822), "no_last_task")
 
 			creation_new_task(db, time_request)
@@ -62,9 +80,9 @@ func main() {
 		}
 
 		today := time.Unix(time_request, 0).Day()
-		day_on_task := time.Unix(data_task.date, 0).Day()
+		day_on_task := time.Unix(data_task.Date, 0).Day()
 
-		if data_task.completed == 1 { //завершено, смотрим на его дату,если:
+		if data_task.Completed == 1 { //завершено, смотрим на его дату,если:
 
 			if today != day_on_task { //не сегодня, то создаем новое задание,
 				fmt.Println(time.Now().Format(time.RFC822), "last_task_completed_not_today")
@@ -80,27 +98,27 @@ func main() {
 
 			} else { //сегодня, сделать паузу до конца суток
 				fmt.Println(time.Now().Format(time.RFC822), "last_task_completed_today")
-				
+
 				fmt.Println(time.Now().Format(time.RFC822), "Sleep 30 minutes") //////
 				time.Sleep(time.Minute * 30)                                    //////
-				
+
 				continue
 			}
 
 		} else {
 			fmt.Println(time.Now().Format(time.RFC822), "last_task_not_completed")
 
-			time_request = data_task.date
+			time_request = data_task.Date
 			fmt.Println(time.Now().Format(time.RFC822), "copy_time_request_from_task")
 
-			if data_task.primary_check == 0 {
+			if data_task.Primary_check == 0 {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_not_completed")
 
-				data_keys, err = request_keywords(db, data_task.last_processed_key_id)
+				data_keys, err = request_keywords(db, data_task.Last_processed_key_id)
 				if err != nil {
 					log.Fatal("request_keywords(): ", err)
 				}
-				fmt.Printf(time.Now().Format(time.RFC822)+ " request_keywords(%v)\n", data_task.last_processed_key_id)
+				fmt.Printf(time.Now().Format(time.RFC822)+" request_keywords(%v)\n", data_task.Last_processed_key_id)
 
 			} else {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_completed")
@@ -133,15 +151,15 @@ func main() {
 		for _, data := range data_keys {
 
 			var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query=%v&groupby=",
-				data_accounts[active_account_id].account_name, data_accounts[active_account_id].account_key,
-				url.QueryEscape(data.keyword_name)) /////
+				data_accounts[active_account_id].Account_name, data_accounts[active_account_id].Account_key,
+				url.QueryEscape(data.Keyword_name)) /////
 
 			respData := GetRequest(url+"groups-on-page%3D100", active_accout) ////
 
-			v := Result{}
+			v := models.Result{}
 
 			xml.Unmarshal(respData, &v)
-			fmt.Println(time.Now().Format(time.RFC822),"GetRequest ", data.keyword_name)
+			fmt.Println(time.Now().Format(time.RFC822), "GetRequest ", data.Keyword_name)
 
 			response := v.Response
 
@@ -168,22 +186,22 @@ func main() {
 
 			result := v.Response.Results.Grouping.Group
 
-			var vol Group
+			var vol models.Group
 
 			result_found := false
 			for i, vol := range result {
-				if vol.Host_name == data.host_name {
-					if data.in_statistics == 0 { //новое значение в базу
+				if vol.Host_name == data.Host_name {
+					if data.In_statistics == 0 { //новое значение в базу
 						fmt.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_write_to_the_database\n", i)
 
 						insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
-						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.host_id, data.keyword_id)
+						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.Host_id, data.Keyword_id)
 						if err != nil {
 							log.Fatal("INSERT INTO statistics ", err)
 						}
 						insert.Close()
 
-						insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.keyword_id, time_request)
+						insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE task ", err)
 						}
@@ -193,7 +211,7 @@ func main() {
 						fmt.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_update_the_value_in_the_database\n", i)
 
 						insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
-						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.keyword_id, time_request)
+						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.Keyword_id, time_request)
 						if err != nil {
 							log.Fatal("UPDATE statistics", err)
 						}
@@ -205,16 +223,16 @@ func main() {
 			}
 
 			if !result_found {
-				if data.in_statistics == 0 {
+				if data.In_statistics == 0 {
 					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_write_position_zero_to_database")
 
 					insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
-					VALUES (?, ?, ?, ?, ?)`, 0, vol.Url, time_request, data.host_id, data.keyword_id)
+					VALUES (?, ?, ?, ?, ?)`, 0, vol.Url, time_request, data.Host_id, data.Keyword_id)
 					if err != nil {
 						log.Fatal("INSERT INTO statistics when position_num=0", err)
 					}
 					insert.Close()
-					insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.keyword_id, time_request)
+					insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
 					if err != nil {
 						log.Fatal("UPDATE task ", err)
 					}
@@ -222,7 +240,7 @@ func main() {
 				} else {
 					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_updating_test_information")
 
-					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.keyword_id, time_request)
+					insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.Keyword_id, time_request)
 					if err != nil {
 						log.Fatal("UPDATE statistics", err)
 					}
@@ -246,56 +264,6 @@ func main() {
 
 }
 
-type Account struct {
-	id             int
-	account_name   string
-	account_key    string
-	proxy_ip       string
-	proxy_login    string
-	proxy_password string
-}
-
-type Task struct {
-	date                  int64
-	last_processed_key_id int
-	primary_check         int
-	completed             int
-}
-
-type Keywords struct {
-	keyword_id    int
-	keyword_name  string
-	host_id       int
-	host_name     string
-	in_statistics int
-}
-
-type Group struct {
-	Host_name string `xml:"doc>domain"`
-	Url       string `xml:"doc>url"`
-}
-
-type Grouping struct {
-	Page  int     `xml:"page"`
-	Group []Group `xml:"group"`
-}
-
-type Results struct {
-	Grouping Grouping `xml:"grouping"`
-}
-type Error struct {
-	Error_code int `xml:"code,attr"`
-}
-
-type Response struct {
-	Error   Error   `xml:"error"`
-	Results Results `xml:"results"`
-}
-
-type Result struct {
-	Response Response `xml:"response"`
-}
-
 func GetRequest(url string, active_accout *http.Client) []byte {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -312,14 +280,14 @@ func GetRequest(url string, active_accout *http.Client) []byte {
 	return respData
 }
 
-func request_last_task(db *sql.DB) (Task, error) {
+func request_last_task(db *sql.DB) (models.Task, error) {
 	row := db.QueryRow(`SELECT date, last_processed_key_id, primary_check, completed 
 	FROM task ORDER BY id DESC LIMIT 1;`)
 
-	var data_task Task
+	var data_task models.Task
 
-	if err := row.Scan(&data_task.date, &data_task.last_processed_key_id, &data_task.primary_check,
-		&data_task.completed); err != nil {
+	if err := row.Scan(&data_task.Date, &data_task.Last_processed_key_id, &data_task.Primary_check,
+		&data_task.Completed); err != nil {
 		return data_task, fmt.Errorf("request_last_task() %v", err) //завязано на логику
 	}
 
@@ -330,8 +298,8 @@ func request_last_task(db *sql.DB) (Task, error) {
 	return data_task, nil
 }
 
-func request_keywords(db *sql.DB, n int) ([]Keywords, error) {
-	var data_keys []Keywords
+func request_keywords(db *sql.DB, n int) ([]models.Keywords, error) {
+	var data_keys []models.Keywords
 	rows, err := db.Query(`SELECT keywords.id, keywords.keyword_name, hosts.id,hosts.host_name FROM keywords 
 	LEFT JOIN hosts ON hosts.id=keywords.host_id WHERE keywords.id > ?;`, n)
 	if err != nil {
@@ -340,8 +308,8 @@ func request_keywords(db *sql.DB, n int) ([]Keywords, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var data Keywords
-		if err := rows.Scan(&data.keyword_id, &data.keyword_name, &data.host_id, &data.host_name); err != nil {
+		var data models.Keywords
+		if err := rows.Scan(&data.Keyword_id, &data.Keyword_name, &data.Host_id, &data.Host_name); err != nil {
 			return nil, fmt.Errorf("request_keywords %v", err)
 		}
 		data_keys = append(data_keys, data)
@@ -352,8 +320,8 @@ func request_keywords(db *sql.DB, n int) ([]Keywords, error) {
 	return data_keys, nil
 }
 
-func request_statistics_zero_positions(db *sql.DB, time_request int64, max_test int) ([]Keywords, error) {
-	var data_keys []Keywords
+func request_statistics_zero_positions(db *sql.DB, time_request int64, max_test int) ([]models.Keywords, error) {
+	var data_keys []models.Keywords
 
 	rows, err := db.Query(`SELECT statistics.keyword_id, keywords.keyword_name,hosts.id,hosts.host_name FROM statistics 
 	LEFT JOIN hosts ON hosts.id=statistics.host_id 
@@ -365,11 +333,11 @@ func request_statistics_zero_positions(db *sql.DB, time_request int64, max_test 
 	defer rows.Close()
 
 	for rows.Next() {
-		var data Keywords
-		if err := rows.Scan(&data.keyword_id, &data.keyword_name, &data.host_id, &data.host_name); err != nil {
+		var data models.Keywords
+		if err := rows.Scan(&data.Keyword_id, &data.Keyword_name, &data.Host_id, &data.Host_name); err != nil {
 			return nil, fmt.Errorf("equest_statistics_zero_positions() %v", err)
 		}
-		data.in_statistics = 1
+		data.In_statistics = 1
 		data_keys = append(data_keys, data)
 	}
 	if err := rows.Err(); err != nil {
@@ -386,25 +354,25 @@ func creation_new_task(db *sql.DB, time_request int64) {
 	insert.Close()
 }
 
-func account_change(active_accout_id int, data_accounts []Account) (int, *http.Client) {
+func account_change(active_accout_id int, data_accounts []models.Account) (int, *http.Client) {
 	if active_accout_id+1 < len(data_accounts) {
 		active_accout_id++
 
-		proxyUrl, _ := url.Parse(fmt.Sprintf(`http://%v:%v@%v`, data_accounts[active_accout_id].proxy_login,
-			data_accounts[active_accout_id].proxy_password, data_accounts[active_accout_id].proxy_ip))
+		proxyUrl, _ := url.Parse(fmt.Sprintf(`http://%v:%v@%v`, data_accounts[active_accout_id].Proxy_login,
+			data_accounts[active_accout_id].Proxy_password, data_accounts[active_accout_id].Proxy_ip))
 
 		myClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
-		fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_accout_id].account_name)
+		fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_accout_id].Account_name)
 
 		return active_accout_id, myClient
 	}
-	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[0].account_name)
+	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[0].Account_name)
 
 	return 0, http.DefaultClient
 }
 
-func request_accounts(db *sql.DB) ([]Account, error) {
-	var data_accounts []Account
+func request_accounts(db *sql.DB) ([]models.Account, error) {
+	var data_accounts []models.Account
 	rows, err := db.Query(`SELECT * FROM accounts;`)
 	if err != nil {
 		log.Fatal("request_accounts()", err)
@@ -412,9 +380,9 @@ func request_accounts(db *sql.DB) ([]Account, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var data Account
-		if err := rows.Scan(&data.id, &data.account_name, &data.account_key, &data.proxy_ip,
-			&data.proxy_login, &data.proxy_password); err != nil {
+		var data models.Account
+		if err := rows.Scan(&data.Id, &data.Account_name, &data.Account_key, &data.Proxy_ip,
+			&data.Proxy_login, &data.Proxy_password); err != nil {
 			return nil, fmt.Errorf("request_accounts() %v", err)
 		}
 		data_accounts = append(data_accounts, data)
