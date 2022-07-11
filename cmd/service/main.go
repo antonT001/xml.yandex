@@ -135,7 +135,7 @@ func main() {
 					infoLog.Println("last_task_completed_today")
 
 					infoLog.Println("sleep_30_minutes") //////
-					time.Sleep(time.Minute * 30)                                        //////
+					time.Sleep(time.Minute * 30)//////
 
 					continue
 				}
@@ -156,7 +156,7 @@ func main() {
 						time.Sleep(time.Minute)
 						break
 					}
-					infoLog.Printf(time.Now().Format(time.RFC822)+" request_keywords(%v)\n", data_task.Last_processed_key_id)
+					infoLog.Printf("request_keywords(%v)\n", data_task.Last_processed_key_id)
 
 				} else {
 					infoLog.Println("primary_check_completed")
@@ -252,7 +252,7 @@ func main() {
 				for i, vol := range result {
 					if vol.Host_name == data.Host_name {
 						if data.In_statistics == 0 { //новое значение в базу
-							infoLog.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_write_to_the_database\n", i)
+							infoLog.Printf("keyword_found_at_position_%v,_write_to_the_database\n", i)
 
 							insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.Host_id, data.Keyword_id)
@@ -274,7 +274,7 @@ func main() {
 							insert.Close()
 
 						} else { //старое значения в базе
-							infoLog.Printf(time.Now().Format(time.RFC822)+" keyword_found_at_position_%v,_update_the_value_in_the_database\n", i)
+							infoLog.Printf("keyword_found_at_position_%v,_update_the_value_in_the_database\n", i)
 
 							insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
 						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.Keyword_id, time_request)
