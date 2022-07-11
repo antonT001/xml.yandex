@@ -1,9 +1,5 @@
 package main
 
-//https://yandex.ru/search/xml?action=limits-info&user=seo-art-spectrum&key=03.437953978:a79c783413e3d0d205a60ce7ea6762c5
-
-//http://user:password2@144.76.91.205:1010/yandex.ru/search/xml?user=migunowvad&key=03.1046407880:1a97fb53f91282cbd5dddc7fb48b8f25&lr=2&query=планкен%20купитьgroupby=groups-on-page%3D100
-
 import (
 	"database/sql"
 	"encoding/xml"
@@ -45,50 +41,6 @@ func main() {
 	}
 	fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
 	fmt.Println(time.Now().Format(time.RFC822), "activated_account:", data_accounts[active_account_id].account_name)
-
-	/*
-		data_accounts, err := request_accounts(db)
-		if err != nil {
-			fmt.Println(time.Now().Format(time.RFC822), err)
-		}
-		fmt.Println(time.Now().Format(time.RFC822), "request_accounts")
-
-
-		///
-		fmt.Println("data_accounts= ", data_accounts)
-		///
-		///
-		fmt.Println("active_accout= ", active_accout)
-		///
-		active_accout, err = account_change(active_accout, data_accounts)
-		if err != nil {
-			fmt.Println(time.Now().Format(time.RFC822), err)
-		}
-		fmt.Println(time.Now().Format(time.RFC822), "account_change")
-		///
-		fmt.Println("active_accout= ", active_accout)
-		///
-		active_accout, err = account_change(active_accout, data_accounts)
-		if err != nil {
-			fmt.Println(time.Now().Format(time.RFC822), err)
-		}
-		fmt.Println(time.Now().Format(time.RFC822), "account_change")
-		///
-		fmt.Println("active_accout= ", active_accout)
-		///
-		active_accout, err = account_change(active_accout, data_accounts)
-		if err != nil {
-			fmt.Println(time.Now().Format(time.RFC822), err)
-		}
-		fmt.Println(time.Now().Format(time.RFC822), "account_change")
-		///
-		fmt.Println("active_accout= ", active_accout)
-		///
-
-		///
-		time.Sleep(time.Minute)
-		///
-	*/
 
 	for {
 		time_request := time.Now().Unix()
