@@ -105,14 +105,14 @@ func main() {
 			} else {
 				fmt.Println(time.Now().Format(time.RFC822), "primary_check_completed")
 
-				data_keys, err = request_statistics_0_positions(db, time_request, max_test)
+				data_keys, err = request_statistics_zero_positions(db, time_request, max_test)
 				if err != nil {
 					log.Fatal("request_keywords(): ", err)
 				}
-				fmt.Println(time.Now().Format(time.RFC822), "request_statistics_0_positions")
+				fmt.Println(time.Now().Format(time.RFC822), "request_statistics_zero_positions")
 
 				if len(data_keys) < 1 {
-					fmt.Println(time.Now().Format(time.RFC822), "all_0_positions_processed")
+					fmt.Println(time.Now().Format(time.RFC822), "all_zero_positions_processed")
 
 					insert, err := db.Query(`UPDATE task SET completed = 1 WHERE date = ?;`, time_request)
 					if err != nil {
@@ -206,7 +206,7 @@ func main() {
 
 			if !result_found {
 				if data.in_statistics == 0 {
-					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_write_position_0_to_database")
+					fmt.Println(time.Now().Format(time.RFC822), "keyword_not_found_write_position_zero_to_database")
 
 					insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 					VALUES (?, ?, ?, ?, ?)`, 0, vol.Url, time_request, data.host_id, data.keyword_id)
@@ -352,7 +352,7 @@ func request_keywords(db *sql.DB, n int) ([]Keywords, error) {
 	return data_keys, nil
 }
 
-func request_statistics_0_positions(db *sql.DB, time_request int64, max_test int) ([]Keywords, error) {
+func request_statistics_zero_positions(db *sql.DB, time_request int64, max_test int) ([]Keywords, error) {
 	var data_keys []Keywords
 
 	rows, err := db.Query(`SELECT statistics.keyword_id, keywords.keyword_name,hosts.id,hosts.host_name FROM statistics 
@@ -360,20 +360,20 @@ func request_statistics_0_positions(db *sql.DB, time_request int64, max_test int
 	LEFT JOIN keywords ON keywords.id=statistics.keyword_id 
 	WHERE position_num = 0 && date = ? && test_number< ?;`, time_request, max_test)
 	if err != nil {
-		log.Fatal("equest_statistics_0_positions()", err)
+		log.Fatal("equest_statistics_zero_positions()", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var data Keywords
 		if err := rows.Scan(&data.keyword_id, &data.keyword_name, &data.host_id, &data.host_name); err != nil {
-			return nil, fmt.Errorf("equest_statistics_0_positions() %v", err)
+			return nil, fmt.Errorf("equest_statistics_zero_positions() %v", err)
 		}
 		data.in_statistics = 1
 		data_keys = append(data_keys, data)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("equest_statistics_0_positions() %v", err)
+		return nil, fmt.Errorf("equest_statistics_zero_positions() %v", err)
 	}
 	return data_keys, nil
 }
