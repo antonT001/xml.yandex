@@ -1,0 +1,10 @@
+version: "3.3"
+services:
+  mysql:
+    build: ./mysql
+    container_name: mysql_backend.admin_panel
+    volumes:
+        - ${MYSQL_DATA_PATH}:/var/lib/mysql/
+    ports:
+        - 13306:3306
+    restart: always

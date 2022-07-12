@@ -13,22 +13,22 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/yaml.v3"
+	"xml.yandex/internal/clients"
 	"xml.yandex/internal/models"
 )
 
 func main() {
 	var data_keys []models.Keywords
 
-	max_test := 3
+	max_test := 2
 	active_account_id := 0
 	active_accout := http.DefaultClient
-	var config_db models.Database
 
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	var config_db models.Database
 
 	for {
-
 		data, err := os.ReadFile(".config.cfg")
 		if err != nil {
 			errorLog.Println(err)
@@ -45,30 +45,29 @@ func main() {
 			continue
 		}
 
-		dataSourceName := fmt.Sprintf("%v:%v@tcp(%v)/%v", config_db.User_name, config_db.Password, config_db.Host, config_db.Db_name)
+		dataSourceName := fmt.Sprintf("%v:%v@tcp(%v)/%v", config_db.User_name, config_db.Password,
+			config_db.Host, config_db.Db_name)
 
-		db, err := sql.Open("mysql", dataSourceName)
+		db, err := clients.NewDb(dataSourceName)
 		if err != nil {
 			errorLog.Println(err)
 			infoLog.Println("program_restart")
 			time.Sleep(time.Minute)
 			continue
 		}
-		db.SetMaxOpenConns(10)
-		db.SetConnMaxIdleTime(time.Second * 10)
-		db.SetConnMaxLifetime(time.Second * 10)
 
-		pingErr := db.Ping()
+		
+		pingErr := db.Db().Ping()
 		if pingErr != nil {
-			errorLog.Println(err)
+			errorLog.Println(pingErr)
 			infoLog.Println("program_restart")
 			time.Sleep(time.Minute)
 			continue
 		}
 		infoLog.Println("connected_db")
-		defer db.Close()
+		defer db.Db().Close()
 
-		data_accounts, err := request_accounts(db)
+		data_accounts, err := request_accounts(db.Db())
 		if err != nil {
 			errorLog.Println(err)
 			infoLog.Println("program_restart")
@@ -81,13 +80,13 @@ func main() {
 		for {
 			time_request := time.Now().Unix()
 
-			data_task, err := request_last_task(db)
+			data_task, err := request_last_task(db.Db())
 			infoLog.Println("request_last_task")
 			if err != nil {
 				errorLog.Println(err)
 				infoLog.Println("program_restart")
 				time.Sleep(time.Minute)
-				_ = creation_new_task(db, time_request) //это вообще легально?
+				_ = creation_new_task(db.Db(), time_request) //это вообще легально?
 
 				break
 			}
@@ -95,7 +94,7 @@ func main() {
 			if data_task.Date == 0 {
 				infoLog.Println("no_last_task")
 
-				creation_new_task(db, time_request)
+				creation_new_task(db.Db(), time_request)
 				if err != nil {
 					errorLog.Println(err)
 					infoLog.Println("program_restart")
@@ -113,7 +112,7 @@ func main() {
 				if today != day_on_task { //не сегодня, то создаем новое задание,
 					infoLog.Println("last_task_completed_not_today")
 
-					creation_new_task(db, time_request)
+					creation_new_task(db.Db(), time_request)
 					if err != nil {
 						errorLog.Println(err)
 						infoLog.Println("program_restart")
@@ -122,7 +121,7 @@ func main() {
 					}
 					infoLog.Println("creation_new_task")
 
-					data_keys, err = request_keywords(db, 0)
+					data_keys, err = request_keywords(db.Db(), 0)
 					if err != nil {
 						errorLog.Println(err)
 						infoLog.Println("program_restart")
@@ -151,7 +150,7 @@ func main() {
 				if data_task.Primary_check == 0 {
 					infoLog.Println("primary_check_not_completed")
 
-					data_keys, err = request_keywords(db, data_task.Last_processed_key_id)
+					data_keys, err = request_keywords(db.Db(), data_task.Last_processed_key_id)
 					if err != nil {
 						errorLog.Println(err)
 						infoLog.Println("program_restart")
@@ -163,7 +162,7 @@ func main() {
 				} else {
 					infoLog.Println("primary_check_completed")
 
-					data_keys, err = request_statistics_zero_positions(db, time_request, max_test)
+					data_keys, err = request_statistics_zero_positions(db.Db(), time_request, max_test)
 					if err != nil {
 						errorLog.Println(err)
 						infoLog.Println("program_restart")
@@ -175,7 +174,7 @@ func main() {
 					if len(data_keys) < 1 {
 						infoLog.Println("all_zero_positions_processed")
 
-						insert, err := db.Query(`UPDATE task SET completed = 1 WHERE date = ?;`, time_request)
+						insert, err := db.Db().Query(`UPDATE task SET completed = 1 WHERE date = ?;`, time_request)
 						if err != nil {
 							errorLog.Println(err)
 							infoLog.Println("program_restart")
@@ -198,7 +197,7 @@ func main() {
 
 				var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query=%v&groupby=",
 					data_accounts[active_account_id].Account_name, data_accounts[active_account_id].Account_key,
-					url.QueryEscape(data.Keyword_name))+"groups-on-page%3D100"
+					url.QueryEscape(data.Keyword_name)) + "groups-on-page%3D100"
 
 				respData, err := GetRequest(url, active_accout)
 				if err != nil {
@@ -228,10 +227,9 @@ func main() {
 					}
 					infoLog.Println("account_change")
 					infoLog.Println("activated_account:", data_accounts[active_account_id].Account_name)
-					
 
 					if active_account_id == 0 {
-						data_accounts, err = request_accounts(db)
+						data_accounts, err = request_accounts(db.Db())
 						if err != nil {
 							errorLog.Println(err)
 							infoLog.Println("program_restart")
@@ -260,7 +258,7 @@ func main() {
 						if data.In_statistics == 0 { //новое значение в базу
 							infoLog.Printf("keyword_found_at_position_%v,_write_to_the_database\n", i)
 
-							insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
+							insert, err := db.Db().Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 						VALUES (?, ?, ?, ?, ?);`, i+1, vol.Url, time_request, data.Host_id, data.Keyword_id)
 							if err != nil {
 								errorLog.Println(err)
@@ -270,7 +268,7 @@ func main() {
 							}
 							insert.Close()
 
-							insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
+							insert, err = db.Db().Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
 							if err != nil {
 								errorLog.Println(err)
 								infoLog.Println("program_restart")
@@ -282,7 +280,7 @@ func main() {
 						} else { //старое значения в базе
 							infoLog.Printf("keyword_found_at_position_%v,_update_the_value_in_the_database\n", i)
 
-							insert, err := db.Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
+							insert, err := db.Db().Query(`UPDATE statistics SET position_num = ?, url = ?, test_number=test_number+1 
 						WHERE keyword_id=? && date = ?;`, i+1, vol.Url, data.Keyword_id, time_request)
 							if err != nil {
 								errorLog.Println(err)
@@ -301,7 +299,7 @@ func main() {
 					if data.In_statistics == 0 {
 						infoLog.Println("keyword_not_found_write_position_zero_to_database")
 
-						insert, err := db.Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
+						insert, err := db.Db().Query(`INSERT INTO statistics (position_num, url, date, host_id, keyword_id) 
 					VALUES (?, ?, ?, ?, ?)`, 0, vol.Url, time_request, data.Host_id, data.Keyword_id)
 						if err != nil {
 							errorLog.Println(err)
@@ -310,7 +308,7 @@ func main() {
 							break
 						}
 						insert.Close()
-						insert, err = db.Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
+						insert, err = db.Db().Query(`UPDATE task SET last_processed_key_id = ? WHERE date = ?;`, data.Keyword_id, time_request)
 						if err != nil {
 							errorLog.Println(err)
 							infoLog.Println("program_restart")
@@ -321,7 +319,7 @@ func main() {
 					} else {
 						infoLog.Println("keyword_not_found_updating_test_information")
 
-						insert, err := db.Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.Keyword_id, time_request)
+						insert, err := db.Db().Query(`UPDATE statistics SET test_number=test_number+1 WHERE keyword_id=? && date = ?;`, data.Keyword_id, time_request)
 						if err != nil {
 							errorLog.Println(err)
 							infoLog.Println("program_restart")
@@ -336,7 +334,7 @@ func main() {
 
 			if !error_flag {
 				//первичный проход выполнен
-				insert, err := db.Query(`UPDATE task SET primary_check = 1 WHERE date = ?;`, time_request)
+				insert, err := db.Db().Query(`UPDATE task SET primary_check = 1 WHERE date = ?;`, time_request)
 				if err != nil {
 					errorLog.Println(err)
 					infoLog.Println("program_restart")
