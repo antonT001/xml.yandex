@@ -198,9 +198,9 @@ func main() {
 
 				var url = fmt.Sprintf("https://yandex.ru/search/xml?user=%v&key=%v&lr=2&query=%v&groupby=",
 					data_accounts[active_account_id].Account_name, data_accounts[active_account_id].Account_key,
-					url.QueryEscape(data.Keyword_name)) /////
+					url.QueryEscape(data.Keyword_name))+"groups-on-page%3D100"
 
-				respData, err := GetRequest(url+"groups-on-page%3D100", active_accout) ////
+				respData, err := GetRequest(url, active_accout)
 				if err != nil {
 					errorLog.Println(err)
 					infoLog.Println("program_restart")
