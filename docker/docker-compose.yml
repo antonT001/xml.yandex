@@ -1,4 +1,4 @@
-version: "3.3"
+version: "2.2"
 services:
     mysql:
         build: ./mysql
@@ -13,7 +13,7 @@ services:
             - "13306:3306"
         networks:
             back:
-                ipv4_address: 172.16.238.2
+                ipv4_address: "172.16.238.2"
 
         restart: always
     backend:
@@ -25,10 +25,10 @@ services:
             - MYSQL_USER_NAME_PASS=${MYSQL_USER_NAME_PASS}
             - MYSQL_HOST=172.16.238.2:3306
         volumes:
-            - ${PWD}:/home
+            - ../:/home
         networks:
             back:
-                ipv4_address: 172.16.238.3
+                ipv4_address: "172.16.238.3"
         restart: always
 
 networks:
@@ -37,7 +37,7 @@ networks:
         ipam:
             driver: default
             config:
-                - subnet: 172.16.238.0/24
-                  gateway: 172.16.238.1
+                - subnet: "172.16.238.0/24"
+                  gateway: "172.16.238.1"
     default:
         driver: bridge
