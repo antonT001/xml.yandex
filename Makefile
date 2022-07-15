@@ -1,21 +1,10 @@
 services-start:
-	docker-compose -f docker/docker-compose.yml up -d
+	docker-compose -f docker/docker-compose.yml up -d --build
 
 services-stop:
 	docker-compose -f docker/docker-compose.yml down
 
 mysql-init:
-	docker/mysql/init.sh
+	docker exec -it mysql_xmlyandex /init.sh
 
-build:
-	go build -o bin/service cmd/service/main.go
-
-run:
-	./bin/service
-
-start:
-	go build -o bin/service cmd/service/main.go
-	./bin/service
-
-test:
-	curl http://localhost:8080/admin/page/ -d ''
+		

@@ -1,11 +1,5 @@
 package models
 
-type Database struct {
-	Db_name   string `yaml:"db_name"`
-	User_name string `yaml:"user_name"`
-	Password  string `yaml:"password"`
-	Host      string `yaml:"host"`
-}
 
 type Account struct {
 	Id             int

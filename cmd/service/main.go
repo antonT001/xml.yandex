@@ -12,7 +12,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"gopkg.in/yaml.v3"
 	"xml.yandex/internal/clients"
 	"xml.yandex/internal/models"
 )
@@ -26,27 +25,28 @@ func main() {
 
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
-	var config_db models.Database
+
+	MYSQL_DB_NAME, ok := os.LookupEnv("MYSQL_DB_NAME")
+	if !ok {
+		errorLog.Fatal("env nos set")
+	}
+	MYSQL_USER_NAME, ok := os.LookupEnv("MYSQL_USER_NAME")
+	if !ok {
+		errorLog.Fatal("env nos set")
+	}
+	MYSQL_USER_NAME_PASS, ok := os.LookupEnv("MYSQL_USER_NAME_PASS")
+	if !ok {
+		errorLog.Fatal("env nos set")
+	}
+	MYSQL_HOST, ok := os.LookupEnv("MYSQL_HOST")
+	if !ok {
+		errorLog.Fatal("env nos set")
+	}
 
 	for {
-		data, err := os.ReadFile(".config.cfg")
-		if err != nil {
-			errorLog.Println(err)
-			infoLog.Println("program_restart")
-			time.Sleep(time.Minute)
-			continue
-		}
 
-		err = yaml.Unmarshal([]byte(data), &config_db)
-		if err != nil {
-			errorLog.Println(err)
-			infoLog.Println("program_restart")
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		dataSourceName := fmt.Sprintf("%v:%v@tcp(%v)/%v", config_db.User_name, config_db.Password,
-			config_db.Host, config_db.Db_name)
+		dataSourceName := fmt.Sprintf("%v:%v@tcp(%v)/%v", MYSQL_USER_NAME, MYSQL_USER_NAME_PASS,
+			MYSQL_HOST, MYSQL_DB_NAME)
 
 		db, err := clients.NewDb(dataSourceName)
 		if err != nil {
@@ -56,7 +56,6 @@ func main() {
 			continue
 		}
 
-		
 		pingErr := db.Db().Ping()
 		if pingErr != nil {
 			errorLog.Println(pingErr)
@@ -203,6 +202,7 @@ func main() {
 				if err != nil {
 					errorLog.Println(err)
 					infoLog.Println("program_restart")
+					error_flag = true
 					time.Sleep(time.Minute)
 					break
 				}
@@ -478,5 +478,8 @@ func request_accounts(db *sql.DB) ([]models.Account, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return data_accounts, nil
+	if len(data_accounts) > 0 {
+		return data_accounts, nil
+	}
+	return nil, fmt.Errorf("data_accounts not found")
 }

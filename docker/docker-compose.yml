@@ -1,10 +1,43 @@
 version: "3.3"
 services:
-  mysql:
-    build: ./mysql
-    container_name: mysql_backend.admin_panel
-    volumes:
-        - ${MYSQL_DATA_PATH}:/var/lib/mysql/
-    ports:
-        - 13306:3306
-    restart: always
+    mysql:
+        build: ./mysql
+        container_name: mysql_xmlyandex
+        environment:
+            - MYSQL_DB_NAME=${MYSQL_DB_NAME}
+            - MYSQL_USER_NAME=${MYSQL_USER_NAME}
+            - MYSQL_USER_NAME_PASS=${MYSQL_USER_NAME_PASS}
+        volumes:
+            - ${MYSQL_DATA_PATH}:/var/lib/mysql/
+        ports:
+            - "13306:3306"
+        networks:
+            back:
+                ipv4_address: 172.16.238.2
+
+        restart: always
+    backend:
+        build: ./backend
+        container_name: backend_xmlyandex
+        environment:
+            - MYSQL_DB_NAME=${MYSQL_DB_NAME}
+            - MYSQL_USER_NAME=${MYSQL_USER_NAME}
+            - MYSQL_USER_NAME_PASS=${MYSQL_USER_NAME_PASS}
+            - MYSQL_HOST=172.16.238.2:3306
+        volumes:
+            - ${PWD}:/home
+        networks:
+            back:
+                ipv4_address: 172.16.238.3
+        restart: always
+
+networks:
+    back:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.16.238.0/24
+                  gateway: 172.16.238.1
+    default:
+        driver: bridge
