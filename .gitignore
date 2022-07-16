@@ -1,3 +1,4 @@
 .vscode/
 data_base/
 docker/.env
+logs.txt

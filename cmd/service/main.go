@@ -23,9 +23,14 @@ func main() {
 	active_account_id := 0
 	active_accout := http.DefaultClient
 
-	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
-	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	f, err := os.OpenFile("logs.txt", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		f = os.Stdout
+	}
 
+	infoLog := log.New(f, "INFO\t", log.Ldate|log.Ltime)
+	errorLog := log.New(f, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	
 	MYSQL_DB_NAME, ok := os.LookupEnv("MYSQL_DB_NAME")
 	if !ok {
 		errorLog.Fatal("env nos set")
@@ -134,8 +139,11 @@ func main() {
 
 					h, m, _ := time.Now().Clock()
 					time_out := (24-h)*60 + 60 - m + 60
-					infoLog.Printf("sleep_%v_minutes", time_out)      //////
-					time.Sleep(time.Duration(time_out) * time.Minute) //////
+					infoLog.Printf("sleep_%v_minutes", time_out)
+					time.Sleep(time.Duration(time_out) * time.Minute)
+					if err:= os.Truncate("logs.txt",0); err != nil {
+						errorLog.Printf("Faled to truncate logs.txt: %v", err)
+					}
 
 					continue
 				}
